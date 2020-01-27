@@ -24,13 +24,14 @@ var Version string
 var BuildDate string
 var GitID string
 
+var quietOption = false
+var dOption = false
+
 /*
- * source: https://gist.github.com/indraniel/1a91458984179ab4cf80
- */
+ source: https://gist.github.com/indraniel/1a91458984179ab4cf80
+*/
 func ExtractTarGz(gzipStream io.Reader, ext string, filepacsave string) string {
 
-	//fmt.Println("ext:", ext)
-	//var buf bytes.Buffer
 	var uncompressedStream io.Reader
 	var err error
 	if ext == ".zst" {
@@ -110,8 +111,16 @@ type FilePacSave struct {
 	Filename string
 	Pkgfile  string
 	Content  string
-	//TODO Filenames []string
-	// pour ne pas scanner filesystem.pkg. plusieurs fois ? pas sûr intéret si lecture en mémoire
+}
+
+func (self Pacman) isValidFile(search string) bool {
+	var excludes = [2]string{"/etc/gshadow", "/etc/passwd"}
+	for _, value := range excludes {
+		if value == search {
+			return false
+		}
+	}
+	return true
 }
 
 func (self *Pacman) GetModified() <-chan FilePacSave {
@@ -141,8 +150,10 @@ func (self *Pacman) GetModified() <-chan FilePacSave {
 				if strings.HasPrefix(line, "MODIFIED") {
 					s := strings.SplitN(line, "/", 2)
 					filename = "/" + strings.TrimSpace(s[1])
-					v := FilePacSave{pkgname, version, filename, "", ""}
-					Files = append(Files, v)
+					if self.isValidFile(filename) {
+						v := FilePacSave{pkgname, version, filename, "", ""}
+						Files = append(Files, v)
+					}
 				}
 			}
 
@@ -185,12 +196,23 @@ func main() {
 	}
 	os.Setenv("LANG", "C")
 
+	if len(os.Args) > 1 && strings.ToUpper(os.Args[1]) == "-Q" {
+		quietOption = true
+	}
+	if len(os.Args) > 1 && strings.ToUpper(os.Args[1]) == "-D" {
+		quietOption = true
+		dOption = true
+	}
+
 	p := Pacman{}
 
 	ch := p.GetModified()
 	for v := range ch {
-		fmt.Println("\n\n\033[1m", v.Filename, "\033[0m\t", v.Pkg+"("+v.Version+")\t") //, v.Pkgfile, v.Content != "")
-		if v.Content != "" {
+		if !quietOption {
+			println("\n")
+		}
+		fmt.Println("\033[1m", v.Filename, "\033[0m\t", v.Pkg+"("+v.Version+")\t") //, v.Pkgfile, v.Content != "")
+		if v.Content != "" && !quietOption {
 			print("\033[1;34m")
 			cmd := exec.Command("diff", "-dEiwZB", "/tmp/dconfig/"+v.Filename, v.Filename, "--color=auto", "--new-line-format=+ %L", "--old-line-format=", "--unchanged-line-format=")
 			cmd.Stdout = os.Stdout
@@ -198,6 +220,10 @@ func main() {
 			print("\033[0m")
 			os.Remove("/tmp/dconfig/" + v.Filename)
 		}
+	}
+
+	if dOption {
+		findPointd()
 	}
 
 	//TODO remove /tmp/dconfig/
