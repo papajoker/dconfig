@@ -9,6 +9,10 @@ import (
 	"sync"
 )
 
+/*
+ * Find Override Configuration in /xxx.d/* directories
+ */
+
 type fileToSearch struct {
 	filename string
 	pkg      bool
@@ -49,7 +53,7 @@ func (self filesSearch) get() (ret []string) {
 	return
 }
 
-func findPointd() {
+func FindOverrideConf() {
 	listFiles := filesSearch{}
 	filepath.Walk("/etc",
 		func(path string, info os.FileInfo, err error) error {
@@ -72,5 +76,5 @@ func findPointd() {
 		fmt.Println(v)
 	}
 
-	fmt.Printf("%v/%v files in .d/ NOT in pacman db\n", len(list), len(listFiles.files))
+	fmt.Printf("\n:: %v/%v Override configuration files in .d/ and NOT in pacman db\n", len(list), len(listFiles.files))
 }
